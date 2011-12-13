@@ -21,26 +21,8 @@ namespace Odis {
 
 			init_libelf();
 			load_elf(mem, mem_size);
-
-			/* load segments */
-			std::vector<Part> &seg = part_map["segments"];
-			size_t max_phdr;
-			if(elf_getphdrnum(elf, &max_phdr))
-				throw FileInfoElfException("elf_getphdrnum() failed");
-			for(size_t i = 0; i < max_phdr; i++) {
-				GElf_Phdr phdr;
-				if(gelf_getphdr(elf, i, &phdr) != &phdr)
-					throw FileInfoElfException("gelf_getphdr() failed");
-				
-				seg.push_back(Part(phdr.p_offset,
-								   phdr.p_filesz,
-								   phdr.p_vaddr,
-								   phdr.p_memsz,
-								   segment_name(phdr)));
-			}
-
-			/* load sections */
-			//std::vector<Part> &sec = part_map["sections"];
+			load_segments();
+			load_sections();
 		}
 
 		~FileInfoElf() {
@@ -67,8 +49,7 @@ namespace Odis {
 		}
 
 		/* convert program header type to a string */
-		std::string segment_name(GElf_Phdr &phdr) {
-			std::string name;
+		std::string segment_type(GElf_Phdr &phdr) const {
 			switch(phdr.p_type & 7) {
 			case PT_NULL:
 				return "NULL";
@@ -86,6 +67,50 @@ namespace Odis {
 				return "PHDR";
 			default:
 				return hex(phdr.p_type);
+			}
+		}
+
+		void load_segments() {
+			std::vector<Part>& seg = part_map["segments"];
+			size_t max_phdr;
+			if(elf_getphdrnum(elf, &max_phdr))
+				throw FileInfoElfException("elf_getphdrnum() failed");
+			for(size_t i = 0; i < max_phdr; i++) {
+				GElf_Phdr phdr;
+				if(gelf_getphdr(elf, i, &phdr) != &phdr)
+					throw FileInfoElfException("gelf_getphdr() failed");
+				
+				seg.push_back(Part(phdr.p_offset,
+								   phdr.p_filesz,
+								   phdr.p_vaddr,
+								   phdr.p_memsz,
+								   segment_type(phdr)));
+			}
+		}
+
+		void load_sections() {
+			std::vector<Part>& parts = part_map["sections"];
+
+			size_t shstrndx;
+			if(elf_getshdrstrndx(elf, &shstrndx))
+				throw FileInfoElfException("elf_getshdrstrndx() failed");
+
+			Elf_Scn* scn = nullptr;
+			while((scn = elf_nextscn(elf, scn))) {
+				GElf_Shdr shdr;
+
+				if(gelf_getshdr(scn, &shdr) != &shdr)
+					throw FileInfoElfException("gelf_getshdr() failed");
+
+				char *name;
+				if(!(name = elf_strptr(elf, shstrndx, shdr.sh_name)))
+					throw FileInfoElfException("elf_strptr() failed");
+				
+				parts.push_back(Part(shdr.sh_offset,
+									 shdr.sh_size,
+									 shdr.sh_addr,
+									 shdr.sh_size,
+									 name));
 			}
 		}
 	
