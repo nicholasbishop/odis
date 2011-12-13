@@ -6,10 +6,11 @@
 
 using namespace Odis;
 
-Sqlite::Sqlite(const char *db_filename) throw(SqliteException) : db(0) {
+Sqlite::Sqlite(const std::string& db_filename_)
+	throw(SqliteException) : db(0), db_filename(db_filename_) {
     int rc;
 	
-    if((rc = sqlite3_open(db_filename, &db))) {
+    if((rc = sqlite3_open(db_filename.c_str(), &db))) {
 		sqlite3_close(db);
 		throw SqliteException("sqlite3_open failed");
 	}
@@ -18,6 +19,10 @@ Sqlite::Sqlite(const char *db_filename) throw(SqliteException) : db(0) {
 Sqlite::~Sqlite() {
 	if(db)
 		sqlite3_close(db);
+}
+
+const std::string& Sqlite::name() {
+	return db_filename;
 }
 
 void Sqlite::exec(const char *arg) throw(SqliteException) {
@@ -33,6 +38,8 @@ Sqlite::StepResult Sqlite::step(Stmt &stmt) throw(SqliteException) {
 	switch(rc) {
 	case SQLITE_DONE:
 		return DONE;
+	case SQLITE_ROW:
+		return ROW;
 	default:
 		check_rc(rc);
 	}
@@ -53,13 +60,13 @@ void Sqlite::check_rc(int rc) throw(SqliteException)
 	}
 }
 
-Sqlite::Stmt::Stmt(Sqlite &sqlite_, const char *text) throw(SqliteException)
+Sqlite::Stmt::Stmt(Sqlite &sqlite_, const std::string& text) throw(SqliteException)
 	: stmt(0), sqlite(sqlite_) {
 	int rc;
 
 	rc = sqlite3_prepare_v2(sqlite.db, 
-							text,
-							strlen(text) + 1, 
+							text.c_str(),
+							text.size(),
 							&stmt,
 							0);
 	sqlite.check_rc(rc);
@@ -75,11 +82,11 @@ void Sqlite::Stmt::reset() {
 }
 
 void Sqlite::Stmt::bind_int(int index_from_1,
-							uint64_t val)
+							int64_t val)
 	throw(SqliteException) {
 	int rc;
 
-	rc = sqlite3_bind_int(stmt,
+	rc = sqlite3_bind_int64(stmt,
 						  index_from_1,
 						  val);
 
@@ -140,4 +147,12 @@ void Sqlite::Stmt::bind_blob_with_free(int index_from_1,
 						   blob_data_size,
 						   free);
 	sqlite.check_rc(rc);
+}
+
+std::string Sqlite::Stmt::column_text(int n) {
+	return std::string((const char*)sqlite3_column_text(stmt, n));
+}
+
+int64_t Sqlite::Stmt::column_int(int n) {
+	return sqlite3_column_int64(stmt, n);
 }

@@ -1,3 +1,4 @@
+#include "app.hh"
 #include "file_info.hh"
 #include "sqlite.hh"
 #include <fcntl.h>
@@ -7,54 +8,7 @@
 
 using namespace Odis;
 
-void init_project_db(Sqlite &db) {
-	/* create file table */
-	db.exec("CREATE TABLE IF NOT EXISTS file "
-			"(filepath TEXT, data BLOB)");
-
-	/* create part table */
-	db.exec("CREATE TABLE IF NOT EXISTS part "
-			"(part_type TEXT, file_id INTEGER, "
-			"name TEXT, "
-			"file_offset INTEGER, file_size INTEGER, "
-			"virtual_addr INTEGER, virtual_size INTEGER)");
-}
-
-char *read_file(const char *filepath, size_t *file_length) {
-	/* open file */
-	int fd = open(filepath, O_RDONLY);
-
-	/* get file size */
-	struct stat s;
-	if(fstat(fd, &s))
-		throw Exception("fstat failed");
-	*file_length = s.st_size;
-
-	/* read file data */
-	char *data = new char[s.st_size];
-	ssize_t rc;
-	size_t bytes_read = 0;
-	while((rc = read(fd, data + bytes_read, s.st_size - bytes_read)) > 0)
-		bytes_read += rc;
-	if(rc)
-		throw Exception("read failed");
-	if(bytes_read != (size_t)s.st_size)
-		throw Exception("wrong number of bytes read");
-
-	close(fd);
-	return data;
-}
-
-void project_db_add_file(Sqlite &db, const char *filepath) {
-	size_t file_length;
-	char *file_data = read_file(filepath, &file_length);
-	
-	Sqlite::Stmt stmt(db, "INSERT INTO file VALUES(?, ?)");
-	stmt.bind_text_static(1, filepath);
-	stmt.bind_blob_with_free(2, file_data, file_length, operator delete[]);
-	db.step(stmt);
-}
-
+#if 0
 int main(int argc, char **argv) {
 	if(argc != 2)
 		throw std::exception();
@@ -86,3 +40,12 @@ int main(int argc, char **argv) {
 	delete info;
 	delete data;
 }
+#else
+
+int main(int argc, char *argv[]) {
+	App(argc, argv);
+
+	return 0;
+}
+
+#endif

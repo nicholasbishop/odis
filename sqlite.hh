@@ -2,6 +2,9 @@
 #define SQLITE_HH
 
 #include "exception.hh"
+#include <string>
+#include <tuple>
+#include <vector>
 
 struct sqlite3;
 struct sqlite3_stmt;
@@ -15,24 +18,27 @@ namespace Odis {
 				: Exception(description) {}
 		};
 
-		Sqlite(const char *db_filename) throw(SqliteException);
+		Sqlite(const std::string& db_filename_) throw(SqliteException);
 		~Sqlite();
 
+		const std::string& name();
+
 		void exec(const char *arg) throw(SqliteException);
-		
+
 		enum StepResult {
 			DONE,
+			ROW,
 		};
 
 		class Stmt {
 		public:
-			Stmt(Sqlite &sqlite_, const char *text) throw(SqliteException);
+			Stmt(Sqlite &sqlite_, const std::string& text) throw(SqliteException);
 			~Stmt();
 
 			void reset();
 			
 			void bind_int(int index_from_1,
-						  uint64_t val) throw(SqliteException);
+						  int64_t val) throw(SqliteException);
 			void bind_text_static(int index_from_1,
 								  const char *str) throw(SqliteException);
 			void bind_text_with_copy(int index_from_1,
@@ -46,6 +52,9 @@ namespace Odis {
 									 void (*free)(void*))
 				throw(SqliteException);
 
+			std::string column_text(int n);
+			int64_t column_int(int n);
+
 			struct sqlite3_stmt *stmt;
 		private:
 			Sqlite &sqlite;
@@ -57,6 +66,7 @@ namespace Odis {
 		void check_rc(int rc) throw(SqliteException);
 
 		struct sqlite3 *db;
+		const std::string db_filename;
 	};
 }
 
