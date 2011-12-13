@@ -29,8 +29,14 @@ namespace Odis {
 			Stmt(Sqlite &sqlite_, const char *text) throw(SqliteException);
 			~Stmt();
 
+			void reset();
+			
+			void bind_int(int index_from_1,
+						  uint64_t val) throw(SqliteException);
 			void bind_text_static(int index_from_1,
 								  const char *str) throw(SqliteException);
+			void bind_text_with_copy(int index_from_1,
+									 const char *str) throw(SqliteException);
 			void bind_blob_with_copy(int index_from_1,
 								const void *blob_data,
 								int blob_data_size) throw(SqliteException);
@@ -48,8 +54,7 @@ namespace Odis {
 		StepResult step(Stmt &stmt) throw(SqliteException);
 
 	private:
-		/* if err is non-null, it will be free'd with sqlite3_free() */
-		void check_rc(int rc, char *err = 0) throw(SqliteException);
+		void check_rc(int rc) throw(SqliteException);
 
 		struct sqlite3 *db;
 	};

@@ -1,8 +1,8 @@
 #include "sqlite.hh"
+#include "util.hh"
 #include <cstring>
 #include <sqlite3.h>
 #include <string>
-#include <sstream>
 
 using namespace Odis;
 
@@ -21,11 +21,10 @@ Sqlite::~Sqlite() {
 }
 
 void Sqlite::exec(const char *arg) throw(SqliteException) {
-	char *zErrMsg = 0;
 	int rc;
 	
-	rc = sqlite3_exec(db, arg, 0, 0, &zErrMsg);
-	check_rc(rc, zErrMsg);
+	rc = sqlite3_exec(db, arg, 0, 0, 0);
+	check_rc(rc);
 }
 
 Sqlite::StepResult Sqlite::step(Stmt &stmt) throw(SqliteException) {
@@ -41,24 +40,16 @@ Sqlite::StepResult Sqlite::step(Stmt &stmt) throw(SqliteException) {
 	throw SqliteException("unknown step error");
 }
 
-void Sqlite::check_rc(int rc, char *err) throw(SqliteException)
+void Sqlite::check_rc(int rc) throw(SqliteException)
 {
-	std::stringstream ss;
-
-	/* if an error is passed in, free it */
-	if(err) {
-		ss << err << ": " << rc;
-		sqlite3_free(err);
-	}
-	else
-		ss << "error code " << rc;
-
 	switch(rc) {
 	case SQLITE_OK:
 	case SQLITE_DONE:
 		return;
 	default:
-		throw SqliteException(ss.str().c_str());
+		throw SqliteException((std::string(sqlite3_errmsg(db)) +
+							   ", code " +
+							   to_string(rc)).c_str());
 	}
 }
 
@@ -79,8 +70,38 @@ Sqlite::Stmt::~Stmt() {
 		sqlite3_finalize(stmt);
 }
 
+void Sqlite::Stmt::reset() {
+	sqlite3_reset(stmt);
+}
+
+void Sqlite::Stmt::bind_int(int index_from_1,
+							uint64_t val)
+	throw(SqliteException) {
+	int rc;
+
+	rc = sqlite3_bind_int(stmt,
+						  index_from_1,
+						  val);
+
+	sqlite.check_rc(rc);
+}
+
+
 void Sqlite::Stmt::bind_text_static(int index_from_1,
 									const char *str)
+	throw(SqliteException) {
+	int rc;
+
+	rc = sqlite3_bind_text(stmt,
+						   index_from_1,
+						   str,
+						   strlen(str) + 1,
+						   SQLITE_STATIC);
+	sqlite.check_rc(rc);
+}
+
+void Sqlite::Stmt::bind_text_with_copy(int index_from_1,
+									   const char *str)
 	throw(SqliteException) {
 	int rc;
 
@@ -91,7 +112,6 @@ void Sqlite::Stmt::bind_text_static(int index_from_1,
 						   SQLITE_TRANSIENT);
 	sqlite.check_rc(rc);
 }
-
 
 void Sqlite::Stmt::bind_blob_with_copy(int index_from_1,
 									   const void *blob_data,
