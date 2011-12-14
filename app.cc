@@ -5,61 +5,6 @@
 using namespace Odis;
 using namespace sigc;
 
-#if 0
-GtkWidget *create_parts_treeview() {
-	enum {
-		GROUP,
-		NAME,
-		N_COLUMNS
-	};
-
-	GtkTreeStore *store = gtk_tree_store_new(N_COLUMNS,
-											 G_TYPE_STRING,
-											 G_TYPE_STRING);
-
-	GtkTreeIter iter1, iter2;
-	
-	gtk_tree_store_append(store, &iter1, NULL);
-	gtk_tree_store_set(store, &iter1,
-					   GROUP, "Segments",
-					   -1);
-
-	gtk_tree_store_append(store, &iter2, &iter1);
-	gtk_tree_store_set(store, &iter2,
-					   NAME, "Test",
-					   -1);
-
-	gtk_tree_store_append(store, &iter1, NULL);
-	gtk_tree_store_set(store, &iter1,
-					   GROUP, "Sections",
-					   -1);
-
-	GtkWidget *tree;
-	tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(store));
-
-	/* add columns */
-	GtkCellRenderer *renderer;
-	GtkTreeViewColumn *column;
-	renderer = gtk_cell_renderer_text_new();
-	column = gtk_tree_view_column_new_with_attributes("Group",
-													  renderer,
-													  "text", GROUP,
-													  NULL);
-	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), column);
-
-	column = gtk_tree_view_column_new_with_attributes("Name",
-													  renderer,
-													  "text", NAME,
-													  NULL);
-	gtk_tree_view_append_column(GTK_TREE_VIEW(tree), column);
-
-	/* open all by default */
-	gtk_tree_view_expand_all(GTK_TREE_VIEW(tree));
-
-	return tree;
-}
-#endif
-
 namespace Odis {
 	class ProjectTreeView : public Gtk::TreeView {
 	private:
@@ -154,13 +99,15 @@ void App::init_ui_manager()
 	group->add(Gtk::Action::create("NewProject", Gtk::Stock::NEW,
 								   "New Project", "Create a new project"),
 			   mem_fun(*this, &App::new_project));
+	group->add(Gtk::Action::create("OpenProject", Gtk::Stock::OPEN,
+								   "Open Project", "Open a project"),
+			   mem_fun(*this, &App::open_project));
 	group->add(Gtk::Action::create("SaveProject", Gtk::Stock::SAVE,
 								   "Save Project", "Save the project"),
 			   mem_fun(*this, &App::save_project));
 
 	action = Gtk::Action::create("AddFile", Gtk::Stock::ADD,
 								 "Add File", "Add a file to the project");
-	action->set_sensitive(false);
 	group->add(action, mem_fun(*this, &App::add_file));
 
 	/* create UI manager */
@@ -172,6 +119,7 @@ void App::init_ui_manager()
         "  <menubar name='MenuBar'>"
         "    <menu action='FileMenu'>"
         "      <menuitem action='NewProject'/>"
+		"      <menuitem action='OpenProject'/>"
 		"      <menuitem action='SaveProject'/>"
 		"      <separator/>"
 		"      <menuitem action='AddFile'/>"
@@ -179,6 +127,7 @@ void App::init_ui_manager()
         "  </menubar>"
         "  <toolbar name='ToolBar'>"
         "    <toolitem action='NewProject'/>"
+		"    <toolitem action='OpenProject'/>"
 		"    <toolitem action='SaveProject'/>"
 		"    <separator/>"
 		"    <toolitem action='AddFile'/>"
@@ -190,7 +139,6 @@ void App::init_ui_manager()
 
 App::App(int argc, char **argv) : kit(argc, argv) {
 	/* initialize window */
-	window.set_title("Odis");
 	window.set_default_size(1024, 768);
 	Gtk::Box *box = new Gtk::Box(Gtk::ORIENTATION_VERTICAL);
 
@@ -209,11 +157,26 @@ App::App(int argc, char **argv) : kit(argc, argv) {
 	window.add(*manage(box));
 
 	window.show_all();
+
+	set_project(nullptr);
 	Gtk::Main::run(window);
 }
 
 void App::new_project() {
 	set_project(new Project(":memory:"));
+}
+
+void App::open_project() {
+	Gtk::FileChooserDialog dialog("Select project to open",
+								  Gtk::FILE_CHOOSER_ACTION_OPEN);
+	dialog.set_transient_for(window);
+
+	//Add response buttons the the dialog:
+	dialog.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
+	dialog.add_button(Gtk::Stock::OPEN, Gtk::RESPONSE_OK);
+
+	if(dialog.run() == Gtk::RESPONSE_OK)
+		set_project(new Project(dialog.get_filename()));
 }
 
 void App::save_project() {
@@ -229,18 +192,23 @@ void App::add_file() {
 	dialog.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
 	dialog.add_button(Gtk::Stock::OPEN, Gtk::RESPONSE_OK);
 
-	if(dialog.run() == Gtk::RESPONSE_OK) {
+	if(dialog.run() == Gtk::RESPONSE_OK)
 		project->add_file(dialog.get_filename());
-		project_tree_view->update(project->database());
-	}
 }
 
 void App::set_project(Project* project_) {
 	/* TODO: check if we need to close an old project */
 	project = project_;
 
-	window.set_title(project->name() + " - Odis");
-	ui_manager->get_action("/ToolBar/AddFile")->set_sensitive(project != nullptr);
-	//std::cout << ui_manager->get_ui() << std::endl;
+	if(project)
+		window.set_title(project->name() + " - Odis");
+	else
+		window.set_title("Odis");
 	
+	ui_manager->get_action("/ToolBar/AddFile")->set_sensitive(project != nullptr);
+	project_tree_view->set_sensitive(project != nullptr);
+	//std::cout << ui_manager->get_ui() << std::endl;
+
+	if(project)
+		project_tree_view->update(project->database());	
 }

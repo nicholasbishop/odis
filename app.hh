@@ -22,6 +22,7 @@ namespace Odis {
 
 		/* handlers */
 		void new_project();
+		void open_project();
 		void save_project();
 		void add_file();
 		
