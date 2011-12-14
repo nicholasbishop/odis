@@ -212,3 +212,8 @@ std::string Sqlite::Stmt::column_text(int n) {
 int64_t Sqlite::Stmt::column_int(int n) {
 	return sqlite3_column_int64(stmt, n);
 }
+
+const void* Sqlite::Stmt::column_blob(int n, int* size) {
+	*size = sqlite3_column_bytes(stmt, n);
+	return sqlite3_column_blob(stmt, n);
+}

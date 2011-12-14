@@ -1,5 +1,7 @@
 #include "app.hh"
+#include "hex.hh"
 #include "util.hh"
+#include <iomanip>
 #include <iostream>
 
 using namespace Odis;
@@ -42,7 +44,6 @@ namespace Odis {
 			int64_t prev_file_id;
 			std::string prev_group;
 			
-			std::vector<std::string> parts;
 			Sqlite::Stmt stmt(db,
 							  "SELECT file_id, filepath, part_group, name, "
 							  "file_offset, virtual_addr "
@@ -140,24 +141,31 @@ void App::init_ui_manager()
 App::App(int argc, char **argv) : kit(argc, argv) {
 	/* initialize window */
 	window.set_default_size(1024, 768);
-	Gtk::Box *box = new Gtk::Box(Gtk::ORIENTATION_VERTICAL);
 
-	project_tree_view = new ProjectTreeView();
+	/* vbox, tabs */
+	auto box = new Gtk::Box(Gtk::ORIENTATION_VERTICAL);
+	auto tabs = new Gtk::Notebook();
 
 	/* create menubar/toolbar */
 	init_ui_manager();
 	box->add(*ui_manager->get_widget("/MenuBar"));
 	box->add(*ui_manager->get_widget("/ToolBar"));
 
-	Gtk::ScrolledWindow *scroll = new Gtk::ScrolledWindow();
+	/* project tree view */
+	project_tree_view = new ProjectTreeView();
+	auto scroll = new Gtk::ScrolledWindow();
 	scroll->add(*project_tree_view);
-	box->pack_end(*manage(scroll), true, true);
+	tabs->append_page(*scroll, "Project");
 
-	//box.add(create_parts_treeview());
+	/* hex view */
+	scroll = new Gtk::ScrolledWindow();
+	hex_view = new HexView();
+	scroll->add(*hex_view);
+	tabs->append_page(*scroll, "Hex");
+
+	box->pack_end(*manage(tabs), true, true);
 	window.add(*manage(box));
-
 	window.show_all();
-
 	set_project(nullptr);
 	Gtk::Main::run(window);
 }
@@ -205,6 +213,7 @@ void App::add_file() {
 	if(dialog.run() == Gtk::RESPONSE_OK) {
 		project->add_file(dialog.get_filename());
 		project_tree_view->update(project->database());
+		update_hex_view();
 	}
 }
 
@@ -221,6 +230,22 @@ void App::set_project(Project* project_) {
 	project_tree_view->set_sensitive(project != nullptr);
 	//std::cout << ui_manager->get_ui() << std::endl;
 
-	if(project)
-		project_tree_view->update(project->database());	
+	if(project) {
+		project_tree_view->update(project->database());
+		update_hex_view();
+	}
+}
+
+void App::update_hex_view() {
+	Sqlite::Stmt stmt(project->database(),
+					  "SELECT data FROM file "
+					  "WHERE rowid=?");
+	/* TODO, need to be able to choose file */
+	stmt.bind_int(1, 1);
+
+	project->database().step(stmt);
+	int size;
+	const void* data = stmt.column_blob(0, &size);
+
+	hex_view->set_data(data, size);
 }

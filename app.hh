@@ -6,6 +6,7 @@
 
 namespace Odis {
 	class ProjectTreeView;
+	class HexView;
 
 	class App {
 	public:
@@ -19,6 +20,7 @@ namespace Odis {
 		Gtk::Window window;
 		Glib::RefPtr<Gtk::UIManager> ui_manager;
 		ProjectTreeView *project_tree_view;
+		HexView *hex_view;
 
 		/* handlers */
 		void new_project();
@@ -29,6 +31,8 @@ namespace Odis {
 		/* project */
 		void set_project(Project* project);
 		Project* project;
+
+		void update_hex_view();
 	};
 }
 

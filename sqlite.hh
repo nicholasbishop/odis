@@ -59,6 +59,7 @@ namespace Odis {
 
 			std::string column_text(int n);
 			int64_t column_int(int n);
+			const void* column_blob(int n, int* size);
 
 			struct sqlite3_stmt *stmt;
 		private:
