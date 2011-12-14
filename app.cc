@@ -192,8 +192,10 @@ void App::add_file() {
 	dialog.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
 	dialog.add_button(Gtk::Stock::OPEN, Gtk::RESPONSE_OK);
 
-	if(dialog.run() == Gtk::RESPONSE_OK)
+	if(dialog.run() == Gtk::RESPONSE_OK) {
 		project->add_file(dialog.get_filename());
+		project_tree_view->update(project->database());
+	}
 }
 
 void App::set_project(Project* project_) {
