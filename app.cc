@@ -1,4 +1,5 @@
 #include "app.hh"
+#include "util.hh"
 #include <iostream>
 
 using namespace Odis;
@@ -66,14 +67,14 @@ namespace Odis {
 		{
 		public:
 			ModelColumns() {
-				add(file);
-				add(group);
 				add(name);
+				add(file_offset);
+				add(virtual_addr);
 			}
 
-			Gtk::TreeModelColumn<Glib::ustring> file;
-			Gtk::TreeModelColumn<Glib::ustring> group;
 			Gtk::TreeModelColumn<Glib::ustring> name;
+			Gtk::TreeModelColumn<Glib::ustring> file_offset;
+			Gtk::TreeModelColumn<Glib::ustring> virtual_addr;
 		};
 
 		ModelColumns cols;
@@ -83,9 +84,9 @@ namespace Odis {
 		ProjectTreeView() {
 			store = Gtk::TreeStore::create(cols);
 			set_model(store);
-			append_column("File", cols.file);
-			append_column("Group", cols.group);
 			append_column("Name", cols.name);
+			append_column("File Offset", cols.file_offset);
+			append_column("Virtual Address", cols.virtual_addr);
 		}
 
 		void update(Sqlite& db) {
@@ -98,7 +99,8 @@ namespace Odis {
 			
 			std::vector<std::string> parts;
 			Sqlite::Stmt stmt(db,
-							  "SELECT file_id, filepath, part_group, name "
+							  "SELECT file_id, filepath, part_group, name, "
+							  "file_offset, virtual_addr "
 							  "FROM part, file "
 							  "WHERE part.file_id = file.rowid "
 							  "ORDER BY filepath, part_group");
@@ -110,11 +112,13 @@ namespace Odis {
 				std::string file = stmt.column_text(1);
 				std::string group = stmt.column_text(2);
 				std::string name = stmt.column_text(3);
+				int64_t file_offset = stmt.column_int(4);
+				int64_t virtual_addr = stmt.column_int(5);
 
 				/* check if switching to a new file subtree */
 				if(no_file_tree || file_id != prev_file_id) {
 					i = store->append();
-					(*i)[cols.file] = file;
+					(*i)[cols.name] = file;
 					prev_file_id = file_id;
 					no_file_tree = false;
 					no_group_tree = true;
@@ -123,7 +127,7 @@ namespace Odis {
 				/* check if switching to a new group subtree */
 				if(no_group_tree || group != prev_group) {
 					j = store->append(i->children());
-					(*j)[cols.group] = group;
+					(*j)[cols.name] = group;
 					prev_group = group;
 					no_group_tree = false;
 				}
@@ -131,6 +135,8 @@ namespace Odis {
 				/* append new part */
 				k = store->append(j->children());
 				(*k)[cols.name] = name;
+				(*k)[cols.file_offset] = hex(file_offset);
+				(*k)[cols.virtual_addr] = hex(virtual_addr);
 			}
 
 			expand_all();
@@ -185,7 +191,7 @@ void App::init_ui_manager()
 App::App(int argc, char **argv) : kit(argc, argv) {
 	/* initialize window */
 	window.set_title("Odis");
-	window.set_default_size(200, 200);
+	window.set_default_size(1024, 768);
 	Gtk::Box *box = new Gtk::Box(Gtk::ORIENTATION_VERTICAL);
 
 	project_tree_view = new ProjectTreeView();
