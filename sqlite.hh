@@ -21,6 +21,8 @@ namespace Odis {
 		Sqlite(const std::string& db_filename_) throw(SqliteException);
 		~Sqlite();
 
+		void save(const std::string& path) throw(SqliteException);
+
 		const std::string& name();
 
 		void exec(const char *arg) throw(SqliteException);
@@ -43,6 +45,9 @@ namespace Odis {
 								  const char *str) throw(SqliteException);
 			void bind_text_with_copy(int index_from_1,
 									 const char *str) throw(SqliteException);
+			void bind_blob_static(int index_from_1,
+								  const void *blob_data,
+								  int blob_data_size) throw(SqliteException);
 			void bind_blob_with_copy(int index_from_1,
 								const void *blob_data,
 								int blob_data_size) throw(SqliteException);
@@ -66,7 +71,7 @@ namespace Odis {
 		void check_rc(int rc) throw(SqliteException);
 
 		struct sqlite3 *db;
-		const std::string db_filename;
+		std::string db_filename;
 	};
 }
 

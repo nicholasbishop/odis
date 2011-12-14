@@ -1,10 +1,4 @@
 #include "app.hh"
-#include "file_info.hh"
-#include "sqlite.hh"
-#include <fcntl.h>
-#include <iostream>
-#include <sys/stat.h>
-#include <unistd.h>
 
 using namespace Odis;
 

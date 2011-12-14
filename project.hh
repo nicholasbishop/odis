@@ -7,7 +7,7 @@
 namespace Odis {
 	class Project {
 	public:
-		Project(const char *filename);
+		Project(const std::string& filename);
 
 		Sqlite& database();
 		std::string name();

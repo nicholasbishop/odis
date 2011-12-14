@@ -68,12 +68,12 @@ namespace Odis {
 			ModelColumns() {
 				add(file);
 				add(group);
-				add(part_name);
+				add(name);
 			}
 
 			Gtk::TreeModelColumn<Glib::ustring> file;
 			Gtk::TreeModelColumn<Glib::ustring> group;
-			Gtk::TreeModelColumn<Glib::ustring> part_name;
+			Gtk::TreeModelColumn<Glib::ustring> name;
 		};
 
 		ModelColumns cols;
@@ -85,44 +85,55 @@ namespace Odis {
 			set_model(store);
 			append_column("File", cols.file);
 			append_column("Group", cols.group);
-			append_column("Name", cols.part_name);
+			append_column("Name", cols.name);
 		}
 
 		void update(Sqlite& db) {
 			store->clear();
 
-			std::vector<std::tuple<uint64_t, std::string>> files;
-			Sqlite::Stmt fstmt(db, "SELECT rowid, filepath FROM file");
-			while(db.step(fstmt) == Sqlite::StepResult::ROW) {
-				files.push_back(std::tuple<uint64_t, std::string>
-								(fstmt.column_int(0),
-								 fstmt.column_text(1)));
+			bool no_file_tree = true;
+			bool no_group_tree = true;
+			int64_t prev_file_id;
+			std::string prev_group;
+			
+			std::vector<std::string> parts;
+			Sqlite::Stmt stmt(db,
+							  "SELECT file_id, filepath, part_group, name "
+							  "FROM part, file "
+							  "WHERE part.file_id = file.rowid "
+							  "ORDER BY filepath, part_group");
+
+			Gtk::TreeModel::iterator i, j, k;
+			while(db.step(stmt) == Sqlite::StepResult::ROW) {
+				/* get columns */
+				int64_t file_id = stmt.column_int(0);
+				std::string file = stmt.column_text(1);
+				std::string group = stmt.column_text(2);
+				std::string name = stmt.column_text(3);
+
+				/* check if switching to a new file subtree */
+				if(no_file_tree || file_id != prev_file_id) {
+					i = store->append();
+					(*i)[cols.file] = file;
+					prev_file_id = file_id;
+					no_file_tree = false;
+					no_group_tree = true;
+				}
+
+				/* check if switching to a new group subtree */
+				if(no_group_tree || group != prev_group) {
+					j = store->append(i->children());
+					(*j)[cols.group] = group;
+					prev_group = group;
+					no_group_tree = false;
+				}
+
+				/* append new part */
+				k = store->append(j->children());
+				(*k)[cols.name] = name;
 			}
 
-			std::vector<std::tuple<std::string, std::string>> parts;
-			Sqlite::Stmt pstmt(db,
-							   "SELECT part_group "
-							   "FROM file, part "
-							   "WHERE file.rowid=?");
-
-			for(auto f : files) {
-				Gtk::TreeModel::iterator i = store->append();
-				(*i)[cols.file] = std::get<1>(f);
-
-				parts.clear();
-				pstmt.bind_int(1, std::get<0>(f));
-				while(db.step(pstmt) == Sqlite::StepResult::ROW) {
-					parts.push_back(std::tuple<std::string, std::string>
-									(fstmt.column_text(0),
-									 fstmt.column_text(1)));
-				}
-				pstmt.reset();
-
-				for(auto p : parts) {
-					Gtk::TreeModel::iterator j = store->append(i->children());
-					(*j)[cols.group] = std::get<0>(p);
-				}
-			}
+			expand_all();
 		}
 	};
 }
@@ -137,6 +148,9 @@ void App::init_ui_manager()
 	group->add(Gtk::Action::create("NewProject", Gtk::Stock::NEW,
 								   "New Project", "Create a new project"),
 			   mem_fun(*this, &App::new_project));
+	group->add(Gtk::Action::create("SaveProject", Gtk::Stock::SAVE,
+								   "Save Project", "Save the project"),
+			   mem_fun(*this, &App::save_project));
 
 	action = Gtk::Action::create("AddFile", Gtk::Stock::ADD,
 								 "Add File", "Add a file to the project");
@@ -152,12 +166,14 @@ void App::init_ui_manager()
         "  <menubar name='MenuBar'>"
         "    <menu action='FileMenu'>"
         "      <menuitem action='NewProject'/>"
+		"      <menuitem action='SaveProject'/>"
 		"      <separator/>"
 		"      <menuitem action='AddFile'/>"
         "    </menu>"
         "  </menubar>"
         "  <toolbar name='ToolBar'>"
         "    <toolitem action='NewProject'/>"
+		"    <toolitem action='SaveProject'/>"
 		"    <separator/>"
 		"    <toolitem action='AddFile'/>"
         "  </toolbar>"
@@ -170,7 +186,7 @@ App::App(int argc, char **argv) : kit(argc, argv) {
 	/* initialize window */
 	window.set_title("Odis");
 	window.set_default_size(200, 200);
-	Gtk::Box *box = new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 0);
+	Gtk::Box *box = new Gtk::Box(Gtk::ORIENTATION_VERTICAL);
 
 	project_tree_view = new ProjectTreeView();
 
@@ -178,7 +194,10 @@ App::App(int argc, char **argv) : kit(argc, argv) {
 	init_ui_manager();
 	box->add(*ui_manager->get_widget("/MenuBar"));
 	box->add(*ui_manager->get_widget("/ToolBar"));
-	box->add(*project_tree_view);
+
+	Gtk::ScrolledWindow *scroll = new Gtk::ScrolledWindow();
+	scroll->add(*project_tree_view);
+	box->pack_end(*manage(scroll), true, true);
 
 	//box.add(create_parts_treeview());
 	window.add(*manage(box));
@@ -189,6 +208,10 @@ App::App(int argc, char **argv) : kit(argc, argv) {
 
 void App::new_project() {
 	set_project(new Project(":memory:"));
+}
+
+void App::save_project() {
+	project->database().save("test.sqlite3");
 }
 
 void App::add_file() {

@@ -21,6 +21,47 @@ Sqlite::~Sqlite() {
 		sqlite3_close(db);
 }
 
+void Sqlite::save(const std::string& path) throw(SqliteException) {
+	/* TODO */
+	if(db_filename != ":memory:")
+		throw SqliteException("saving but db not in mem");
+
+	int rc;                   /* Function return code */
+	sqlite3 *db_file;           /* Database connection opened on zFilename */
+	sqlite3_backup *backup;  /* Backup object used to copy data */
+
+	/* Open the database file identified by zFilename. Exit early if this fails
+	** for any reason. */
+	rc = sqlite3_open(path.c_str(), &db_file);
+	check_rc(rc);
+
+	/* Set up the backup procedure to copy from the "main" database of 
+	** connection pFile to the main database of connection pInMemory.
+	** If something goes wrong, pBackup will be set to NULL and an error
+	** code and  message left in connection pTo.
+	**
+	** If the backup object is successfully created, call backup_step()
+	** to copy data from pFile to pInMemory. Then call backup_finish()
+	** to release resources associated with the pBackup object.  If an
+	** error occurred, then  an error code and message will be left in
+	** connection pTo. If no error occurred, then the error code belonging
+	** to pTo is set to SQLITE_OK.
+	*/
+	backup = sqlite3_backup_init(db_file, "main", db, "main");
+	if(backup) {
+		sqlite3_backup_step(backup, -1);
+		sqlite3_backup_finish(backup);
+	}
+	rc = sqlite3_errcode(db_file);
+	check_rc(rc);
+
+	/* close the in-memory db and replace the local handle with the
+	   on-disk db */
+	sqlite3_close(db);
+	db = db_file;
+	db_filename = path;
+}
+
 const std::string& Sqlite::name() {
 	return db_filename;
 }
@@ -119,6 +160,21 @@ void Sqlite::Stmt::bind_text_with_copy(int index_from_1,
 						   SQLITE_TRANSIENT);
 	sqlite.check_rc(rc);
 }
+
+void Sqlite::Stmt::bind_blob_static(int index_from_1,
+									const void *blob_data,
+									int blob_data_size)
+	throw(SqliteException) {
+	int rc;
+
+	rc = sqlite3_bind_blob(stmt,
+						   index_from_1,
+						   blob_data,
+						   blob_data_size,
+						   SQLITE_STATIC);
+	sqlite.check_rc(rc);
+}
+
 
 void Sqlite::Stmt::bind_blob_with_copy(int index_from_1,
 									   const void *blob_data,
