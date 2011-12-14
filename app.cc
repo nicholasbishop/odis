@@ -170,6 +170,16 @@ void App::open_project() {
 	Gtk::FileChooserDialog dialog("Select project to open",
 								  Gtk::FILE_CHOOSER_ACTION_OPEN);
 	dialog.set_transient_for(window);
+	
+	auto db_filter = Gtk::FileFilter::create();
+	db_filter->set_name("Sqlite3 Database");
+	db_filter->add_pattern("*.sqlite3");
+	dialog.add_filter(db_filter);
+	
+	auto all_filter = Gtk::FileFilter::create();
+	all_filter->set_name("All Files");
+	all_filter->add_pattern("*");
+	dialog.add_filter(all_filter);
 
 	//Add response buttons the the dialog:
 	dialog.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
