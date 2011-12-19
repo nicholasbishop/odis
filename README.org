@@ -1,0 +1,6 @@
+* License
+  GNU GPLv3+
+
+* Dependencies
+  + gtkmm-3.0
+  + libelf
